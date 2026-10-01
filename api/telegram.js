@@ -1,5 +1,7 @@
 import TelegramBot from "node-telegram-bot-api";
+
 import { initializeApp, getApps } from "firebase/app";
+
 import {
   getFirestore,
   doc,
@@ -15,13 +17,11 @@ import {
 ========================================================
 TELEGRAM BOT BACKEND
 Vercel Serverless + Telegram Webhook + Firestore
-========================================================
 
 Required Vercel Environment Variables:
 
 BOT_TOKEN
-TELEGRAM_WEBHOOK_SECRET
-
+WEBHOOK_SECRET
 FIREBASE_API_KEY
 FIREBASE_AUTH_DOMAIN
 FIREBASE_PROJECT_ID
@@ -43,8 +43,7 @@ WELCOME_IMAGE_URL
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const WEBHOOK_SECRET =
-  process.env.WEBHOOK_SECRET || "";
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "";
 
 const WEB_APP_URL =
   process.env.WEB_APP_URL ||
@@ -54,7 +53,7 @@ const WELCOME_IMAGE_URL =
   process.env.WELCOME_IMAGE_URL ||
   "https://i.imgur.com/kRnNNbM.jpeg";
 
-const REFERRAL_REWARD = 500;
+const REFERRAL_REWARD = 20;
 
 
 // ======================================================
@@ -120,7 +119,6 @@ const bot = new TelegramBot(BOT_TOKEN, {
 // ======================================================
 
 function normalizeReferralId(value) {
-
   if (
     value === undefined ||
     value === null
@@ -135,8 +133,8 @@ function normalizeReferralId(value) {
   }
 
   /*
-   Telegram deep-link parameters normally use
-   letters, numbers, underscore and hyphen.
+  Telegram deep-link parameters normally use
+  letters, numbers, underscore and hyphen.
   */
 
   if (
@@ -156,7 +154,6 @@ function normalizeReferralId(value) {
 // ======================================================
 
 function extractStartParameter(text) {
-
   if (typeof text !== "string") {
     return null;
   }
@@ -182,9 +179,7 @@ function extractStartParameter(text) {
 // ======================================================
 
 async function getTelegramPhotoUrl(userId) {
-
   try {
-
     const photos =
       await bot.getUserProfilePhotos(
         userId,
@@ -204,8 +199,8 @@ async function getTelegramPhotoUrl(userId) {
     }
 
     /*
-     Telegram usually returns several sizes.
-     Last one is normally the largest.
+    Telegram usually returns several sizes.
+    Last one is normally the largest.
     */
 
     const largestPhoto =
@@ -226,9 +221,7 @@ async function getTelegramPhotoUrl(userId) {
       "/" +
       file.file_path
     );
-
   } catch (error) {
-
     console.error(
       "Telegram photo lookup failed:",
       error
@@ -249,7 +242,6 @@ async function createOrEnsureUser(
   photoURL,
   referralId
 ) {
-
   const userRef =
     doc(
       db,
@@ -266,34 +258,24 @@ async function createOrEnsureUser(
   // ----------------------------------------------------
 
   if (!existing.exists()) {
-
     await setDoc(
       userRef,
       {
         id: String(userId),
-
         name:
           firstName ||
           "User",
-
         photoURL:
           photoURL ||
           "",
-
         coins: 0,
-
         reffer: 0,
-
         refferBy:
           referralId ||
           null,
-
         tasksCompleted: 0,
-
         totalWithdrawals: 0,
-
         frontendOpened: true,
-
         rewardGiven: false,
       }
     );
@@ -309,27 +291,22 @@ async function createOrEnsureUser(
   const current =
     existing.data() || {};
 
-
   const updates = {
-
     frontendOpened: true,
-
   };
 
 
   /*
-   Do not overwrite refferBy
-   or rewardGiven.
+  Do not overwrite refferBy
+  or rewardGiven.
   */
 
   if (
     firstName &&
     firstName !== current.name
   ) {
-
     updates.name =
       firstName;
-
   }
 
 
@@ -337,10 +314,8 @@ async function createOrEnsureUser(
     photoURL &&
     photoURL !== current.photoURL
   ) {
-
     updates.photoURL =
       photoURL;
-
   }
 
 
@@ -358,7 +333,6 @@ async function createOrEnsureUser(
 async function processReferralReward(
   userId
 ) {
-
   const currentUserRef =
     doc(
       db,
@@ -368,13 +342,11 @@ async function processReferralReward(
 
 
   /*
-   IMPORTANT:
+  The reward ledger uses the referred user's
+  Telegram ID as its document ID.
 
-   The reward ledger uses the referred user's
-   Telegram ID as its document ID.
-
-   Therefore the same user can never create
-   another reward ledger entry.
+  Therefore the same user can never create
+  another reward ledger entry.
   */
 
   const rewardRef =
@@ -402,12 +374,10 @@ async function processReferralReward(
       if (
         !currentUserSnapshot.exists()
       ) {
-
         return {
           granted: false,
           reason: "user_not_found",
         };
-
       }
 
 
@@ -446,12 +416,10 @@ async function processReferralReward(
         rewardGiven ||
         !referrerId
       ) {
-
         return {
           granted: false,
           reason: "conditions_not_met",
         };
-
       }
 
 
@@ -462,7 +430,6 @@ async function processReferralReward(
       if (
         rewardSnapshot.exists()
       ) {
-
         transaction.update(
           currentUserRef,
           {
@@ -474,7 +441,6 @@ async function processReferralReward(
           granted: false,
           reason: "already_rewarded",
         };
-
       }
 
 
@@ -486,7 +452,6 @@ async function processReferralReward(
         referrerId ===
         String(userId)
       ) {
-
         transaction.update(
           currentUserRef,
           {
@@ -498,7 +463,6 @@ async function processReferralReward(
           granted: false,
           reason: "self_referral",
         };
-
       }
 
 
@@ -523,12 +487,10 @@ async function processReferralReward(
       if (
         !referrerSnapshot.exists()
       ) {
-
         /*
-         Referrer doesn't exist.
-
-         Mark reward as handled so the same
-         webhook cannot repeatedly attempt it.
+        Referrer doesn't exist.
+        Mark reward as handled so the same
+        webhook cannot repeatedly attempt it.
         */
 
         transaction.update(
@@ -542,7 +504,6 @@ async function processReferralReward(
           granted: false,
           reason: "referrer_not_found",
         };
-
       }
 
 
@@ -599,19 +560,13 @@ async function processReferralReward(
 
 
       return {
-
         granted: true,
-
         referrerId:
-
           referrerId,
 
         reward:
-
           REFERRAL_REWARD,
-
       };
-
     }
   );
 }
@@ -626,7 +581,6 @@ async function updateField(
   field,
   value
 ) {
-
   const userRef =
     doc(
       db,
@@ -653,7 +607,6 @@ async function incrementField(
   field,
   amount
 ) {
-
   const userRef =
     doc(
       db,
@@ -680,7 +633,6 @@ async function sendWelcomeMessage(
   chatId,
   firstName
 ) {
-
   const safeName =
     String(
       firstName ||
@@ -697,59 +649,48 @@ async function sendWelcomeMessage(
 Yaha aap tasks complete karke real rewards kama sakte ho!
 
 🔥 Daily Tasks
+
 🔥 Video Watch
+
 🔥 Mini Apps
+
 🔥 Referral Bonus
+
 🔥 Auto Wallet System
 
 Ready to earn?
+
 Tap START and your journey begins!`;
 
 
   const replyMarkup = {
-
     inline_keyboard: [
-
       [
-
         {
           text:
             "▶ Open App",
 
           web_app: {
-
             url:
               WEB_APP_URL,
-
           },
-
         },
-
       ],
-
     ],
-
   };
 
 
   await bot.sendPhoto(
-
     chatId,
-
     WELCOME_IMAGE_URL,
-
     {
-
       caption:
         caption,
 
       reply_markup:
         replyMarkup,
-
     }
-
   );
-
 }
 
 
@@ -760,7 +701,6 @@ Tap START and your journey begins!`;
 async function handleTelegramUpdate(
   update
 ) {
-
   const message =
     update?.message;
 
@@ -770,9 +710,7 @@ async function handleTelegramUpdate(
     !message.from ||
     !message.chat
   ) {
-
     return;
-
   }
 
 
@@ -783,7 +721,7 @@ async function handleTelegramUpdate(
 
 
   /*
-   This backend handles /start.
+  This backend handles /start.
   */
 
   if (
@@ -791,9 +729,7 @@ async function handleTelegramUpdate(
       text.trim()
     )
   ) {
-
     return;
-
   }
 
 
@@ -841,15 +777,10 @@ async function handleTelegramUpdate(
   // ----------------------------------------------------
 
   await createOrEnsureUser(
-
     userId,
-
     firstName,
-
     photoURL,
-
     referralId
-
   );
 
 
@@ -867,13 +798,9 @@ async function handleTelegramUpdate(
   // ----------------------------------------------------
 
   await sendWelcomeMessage(
-
     message.chat.id,
-
     firstName
-
   );
-
 }
 
 
@@ -893,18 +820,13 @@ export default async function handler(
   if (
     req.method !== "POST"
   ) {
-
     res.status(405).json({
-
       ok: false,
-
       error:
         "Method not allowed",
-
     });
 
     return;
-
   }
 
 
@@ -912,9 +834,7 @@ export default async function handler(
   // TELEGRAM SECRET TOKEN CHECK
   // ----------------------------------------------------
 
-  if (
-     WEBHOOK_SECRET
-  ) {
+  if (WEBHOOK_SECRET) {
 
     const receivedSecret =
       req.headers[
@@ -924,22 +844,20 @@ export default async function handler(
 
     if (
       receivedSecret !==
-     WEBHOOK_SECRET
+      WEBHOOK_SECRET
     ) {
+      console.error(
+        "Telegram webhook secret mismatch."
+      );
 
       res.status(401).json({
-
         ok: false,
-
         error:
           "Unauthorized",
-
       });
 
       return;
-
     }
-
   }
 
 
@@ -954,27 +872,18 @@ export default async function handler(
   if (
     typeof update === "string"
   ) {
-
     try {
-
       update =
         JSON.parse(update);
-
     } catch (error) {
-
       res.status(400).json({
-
         ok: false,
-
         error:
           "Invalid JSON",
-
       });
 
       return;
-
     }
-
   }
 
 
@@ -982,18 +891,13 @@ export default async function handler(
     !update ||
     typeof update !== "object"
   ) {
-
     res.status(400).json({
-
       ok: false,
-
       error:
         "Invalid Telegram update",
-
     });
 
     return;
-
   }
 
 
@@ -1009,19 +913,17 @@ export default async function handler(
 
 
     /*
-     One request completed.
+    One request completed.
 
-     No polling.
-     No loops.
-     No intervals.
-     No background workers.
-     No realtime listeners.
+    No polling.
+    No loops.
+    No intervals.
+    No background workers.
+    No realtime listeners.
     */
 
     res.status(200).json({
-
       ok: true,
-
     });
 
   } catch (error) {
@@ -1033,16 +935,11 @@ export default async function handler(
 
 
     res.status(500).json({
-
       ok: false,
-
       error:
         "Internal server error",
-
     });
-
   }
-
 }
 
 
@@ -1051,13 +948,8 @@ export default async function handler(
 // ======================================================
 
 export {
-
   createOrEnsureUser,
-
   processReferralReward,
-
   updateField,
-
   incrementField,
-
 };
