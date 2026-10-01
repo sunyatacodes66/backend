@@ -43,8 +43,8 @@ WELCOME_IMAGE_URL
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-const TELEGRAM_WEBHOOK_SECRET =
-  process.env.TELEGRAM_WEBHOOK_SECRET || "";
+const WEBHOOK_SECRET =
+  process.env.WEBHOOK_SECRET || "";
 
 const WEB_APP_URL =
   process.env.WEB_APP_URL ||
@@ -913,7 +913,7 @@ export default async function handler(
   // ----------------------------------------------------
 
   if (
-    TELEGRAM_WEBHOOK_SECRET
+     WEBHOOK_SECRET
   ) {
 
     const receivedSecret =
@@ -924,7 +924,7 @@ export default async function handler(
 
     if (
       receivedSecret !==
-      TELEGRAM_WEBHOOK_SECRET
+     WEBHOOK_SECRET
     ) {
 
       res.status(401).json({
