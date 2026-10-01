@@ -663,19 +663,6 @@ If you can see this message, sendMessage is working correctly.`
   }
 }
 
-  await bot.sendPhoto(
-    chatId,
-    WELCOME_IMAGE_URL,
-    {
-      caption:
-        caption,
-
-      reply_markup:
-        replyMarkup,
-    }
-  );
-}
-
 
 // ======================================================
 // 14. HANDLE TELEGRAM UPDATE
