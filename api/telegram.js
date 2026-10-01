@@ -629,56 +629,39 @@ async function incrementField(
 // 13. SEND WELCOME MESSAGE
 // ======================================================
 
-async function sendWelcomeMessage(
-  chatId,
-  firstName
-) {
-  const safeName =
-    String(
-      firstName ||
-        "User"
-    ).slice(
-      0,
-      64
+async function sendWelcomeMessage(chatId, firstName) {
+  const safeName = String(firstName || "User").slice(0, 64);
+
+  console.log("=== TEXT MESSAGE TEST ===");
+  console.log(
+    "BOT TOKEN PREFIX:",
+    BOT_TOKEN ? BOT_TOKEN.slice(0, 8) : "MISSING"
+  );
+  console.log("Chat ID:", chatId);
+
+  try {
+    const result = await bot.sendMessage(
+      chatId,
+      `Hello ${safeName}! 👋
+
+This is a Telegram text-message test.
+
+If you can see this message, sendMessage is working correctly.`
     );
 
+    console.log("=== sendMessage SUCCESS ===");
+    console.log("Message ID:", result?.message_id);
 
-  const caption =
-`👋 Hi! Welcome ${safeName} ⭐
+    return result;
+  } catch (error) {
+    console.error("=== sendMessage FAILED ===");
+    console.error("Error name:", error?.name);
+    console.error("Error message:", error?.message);
+    console.error("Error code:", error?.code);
 
-Yaha aap tasks complete karke real rewards kama sakte ho!
-
-🔥 Daily Tasks
-
-🔥 Video Watch
-
-🔥 Mini Apps
-
-🔥 Referral Bonus
-
-🔥 Auto Wallet System
-
-Ready to earn?
-
-Tap START and your journey begins!`;
-
-
-  const replyMarkup = {
-    inline_keyboard: [
-      [
-        {
-          text:
-            "▶ Open App",
-
-          web_app: {
-            url:
-              WEB_APP_URL,
-          },
-        },
-      ],
-    ],
-  };
-
+    throw error;
+  }
+}
 
   await bot.sendPhoto(
     chatId,
