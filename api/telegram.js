@@ -176,13 +176,40 @@ function extractStartParameter(text) {
 
 // ======================================================
 // 8. GET TELEGRAM PROFILE PHOTO
-// TEMPORARILY DISABLED FOR DEBUGGING
 // ======================================================
 
 async function getTelegramPhotoUrl(userId) {
-  console.log("PROFILE PHOTO TEST: skipped", userId);
-  return "";
+  try {
+    const photos = await bot.getUserProfilePhotos(userId, {
+      limit: 1,
+    });
+
+    const firstPhoto = photos?.photos?.[0];
+
+    if (!firstPhoto || firstPhoto.length === 0) {
+      return "";
+    }
+
+    const largestPhoto = firstPhoto[firstPhoto.length - 1];
+
+    const file = await bot.getFile(largestPhoto.file_id);
+
+    if (!file?.file_path) {
+      return "";
+    }
+
+    return (
+      "https://api.telegram.org/file/bot" +
+      BOT_TOKEN +
+      "/" +
+      file.file_path
+    );
+  } catch (error) {
+    console.error("Telegram photo lookup failed:", error);
+    return "";
+  }
 }
+
 // ======================================================
 // 9. CREATE OR ENSURE USER
 // ======================================================
