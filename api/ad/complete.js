@@ -222,6 +222,8 @@ export default async function handler(
     // the user's coins. This prevents two simultaneous requests
     // from rewarding the same session twice.
 
+let rewardGranted = false;
+    
     await runTransaction(
       db,
       async (transaction) => {
@@ -262,14 +264,25 @@ export default async function handler(
         // NOTE: Re-check the session status inside the transaction.
         // Only one request can successfully change STARTED → COMPLETED.
 
-        if (
-          freshSessionData.status !==
-          "STARTED"
-        ) {
-          throw new Error(
-            "Ad session has already been processed."
-          );
-        }
+        // NOTE: Re-check the session status inside the transaction.
+// A COMPLETED session is treated as an idempotent retry.
+// It will NOT receive another coin reward.
+
+if (
+    freshSessionData.status ===
+    "COMPLETED"
+) {
+    return;
+}
+
+if (
+    freshSessionData.status !==
+    "STARTED"
+) {
+    throw new Error(
+        "Ad session has already been processed."
+    );
+}
 
 
         const freshStartedAt =
@@ -301,7 +314,8 @@ export default async function handler(
           );
         }
 
-
+rewardGranted = true;
+        
         // NOTE: Mark the session as COMPLETED and store the exact
         // reward amount that was credited.
 
@@ -342,18 +356,22 @@ export default async function handler(
     // NOTE: Return a successful result only after the transaction
     // has completed successfully.
 
-    res.status(200).json({
-      ok: true,
+   res.status(200).json({
+    ok: true,
 
-      session_id:
+    session_id:
         sessionId,
 
-      coins_awarded:
-        AD_REWARD_COINS,
+    coins_awarded:
+        rewardGranted
+            ? AD_REWARD_COINS
+            : 0,
 
-      message:
-        "Ad completed successfully.",
-    });
+    message:
+        rewardGranted
+            ? "Ad completed successfully."
+            : "Ad session was already completed.",
+});
 
   } catch (error) {
 
