@@ -46,32 +46,12 @@ export default async function handler(
 
 const method = String(req.method || "").toUpperCase();
 
-if (method === "OPTIONS") {
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://sunyatacodes66.github.io"
-  );
-
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "POST, OPTIONS"
-  );
-
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type"
-  );
-
-  return res.status(204).end();
-}
-
-if (method !== "POST") {
-  return res.status(405).json({
-    ok: false,
-    error: "Method not allowed",
+if (req.method === "OPTIONS") {
+  return res.status(200).json({
+    ok: true,
+    test: "OPTIONS_REACHED"
   });
 }
-
 
   try {
 
