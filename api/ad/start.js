@@ -29,6 +29,7 @@ export default async function handler(
   req,
   res
 ) {
+  console.log("DEBUG METHOD:", req.method);
     res.setHeader(
     "Access-Control-Allow-Origin",
     "https://sunyatacodes66.github.io"
