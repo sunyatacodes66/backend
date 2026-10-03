@@ -44,10 +44,12 @@ export default async function handler(
     "Content-Type"
   );
 
+  // CORS preflight handler
   if (req.method === "OPTIONS") {
     res.status(204).end();
     return;
   }
+  
 
   // NOTE: Only POST requests are allowed for creating ad sessions.
 
