@@ -44,23 +44,33 @@ export default async function handler(
     "Content-Type"
   );
 
-  // CORS preflight handler
-  if (req.method === "OPTIONS") {
-    res.status(204).end();
-    return;
-  }
-  
+const method = String(req.method || "").toUpperCase();
 
-  // NOTE: Only POST requests are allowed for creating ad sessions.
+if (method === "OPTIONS") {
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://sunyatacodes66.github.io"
+  );
 
-  if (req.method !== "POST") {
-    res.status(405).json({
-      ok: false,
-      error: "Method not allowed",
-    });
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "POST, OPTIONS"
+  );
 
-    return;
-  }
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type"
+  );
+
+  return res.status(204).end();
+}
+
+if (method !== "POST") {
+  return res.status(405).json({
+    ok: false,
+    error: "Method not allowed",
+  });
+}
 
 
   try {
