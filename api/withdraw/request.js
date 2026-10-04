@@ -4,6 +4,7 @@
 // before creating the PENDING withdrawal record.
 
 import {
+  collection,
   doc,
   runTransaction,
   serverTimestamp,
@@ -278,10 +279,9 @@ export default async function handler(
         // NOTE: Create a unique withdrawal document inside
         // the same transaction as the coin deduction.
 
-        const withdrawalRef =
+                const withdrawalRef =
           doc(
-            db,
-            "withdrawals"
+            collection(db, "withdrawals")
           );
 
 
