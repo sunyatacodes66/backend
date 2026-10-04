@@ -3,16 +3,21 @@
 // referral count, withdrawal amount, and then atomically deducts coins
 // before creating the PENDING withdrawal record.
 
-import {
-  collection,
-  doc,
-  runTransaction,
-  serverTimestamp,
-} from "firebase/firestore";
+// NOTE (ADMIN MIGRATION): This file now uses the Firebase Admin SDK.
+// Differences from the old client-SDK version:
+//   1. doc(db, ...)                    ->  adminDb.collection(...).doc(...)
+//   2. snapshot.exists()  (a function) ->  snapshot.exists  (a PROPERTY, no brackets)
+//   3. runTransaction(db, fn)          ->  adminDb.runTransaction(fn)
+//   4. serverTimestamp()               ->  FieldValue.serverTimestamp()
+// NOTE (BUG FIX): The withdrawal document is now created with an
+// auto-generated ID: adminDb.collection("withdrawals").doc().
+// The old code doc(db, "withdrawals") pointed at a collection, not a
+// document, and always threw an error.
 
 import {
-  db,
-} from "../_lib/firebase.js";
+  adminDb,
+  FieldValue,
+} from "../_lib/firebaseAdmin.js";
 
 import {
   getTelegramUserFromInitData,
@@ -33,7 +38,9 @@ export default async function handler(
   res
 ) {
 
-    res.setHeader(
+  // NOTE: CORS headers - only the Mini App's GitHub Pages origin is allowed.
+
+  res.setHeader(
     "Access-Control-Allow-Origin",
     "https://sunyatacodes66.github.io"
   );
@@ -118,7 +125,7 @@ export default async function handler(
 
 
     // NOTE: Withdrawal amount must be a positive whole number
-    // of coins and must respect the 10 coins = ₹1 conversion.
+    // of coins and must respect the 10 coins = Rs 1 conversion.
 
     if (
       !Number.isSafeInteger(
@@ -161,7 +168,7 @@ export default async function handler(
       res.status(400).json({
         ok: false,
         error:
-          `Minimum withdrawal is ₹${MINIMUM_WITHDRAW_RS}.`,
+          `Minimum withdrawal is Rs ${MINIMUM_WITHDRAW_RS}.`,
         minimum_coins:
           MINIMUM_WITHDRAW_COINS,
         minimum_rs:
@@ -172,12 +179,12 @@ export default async function handler(
     }
 
 
+    // NOTE (CHANGED): Admin SDK document reference for the user.
+
     const userRef =
-      doc(
-        db,
-        "users",
-        userId
-      );
+      adminDb
+        .collection("users")
+        .doc(userId);
 
 
     // NOTE: Balance verification, referral verification,
@@ -190,8 +197,10 @@ export default async function handler(
     let withdrawalAmountRs = 0;
 
 
-    await runTransaction(
-      db,
+    // NOTE (CHANGED): adminDb.runTransaction(...) instead of
+    // runTransaction(db, ...).
+
+    await adminDb.runTransaction(
       async (transaction) => {
 
         const userSnapshot =
@@ -200,8 +209,11 @@ export default async function handler(
           );
 
 
+        // NOTE (CHANGED): In the Admin SDK "exists" is a PROPERTY,
+        // not a function. userSnapshot.exists() would crash.
+
         if (
-          !userSnapshot.exists()
+          !userSnapshot.exists
         ) {
           throw new Error(
             "User account not found."
@@ -232,14 +244,14 @@ export default async function handler(
 
 
         // NOTE: Both requirements are mandatory:
-        // minimum ₹300 balance AND minimum 6 valid referrals.
+        // minimum Rs 300 balance AND minimum 6 valid referrals.
 
         if (
           currentCoins <
           MINIMUM_WITHDRAW_COINS
         ) {
           throw new Error(
-            `Minimum ₹${MINIMUM_WITHDRAW_RS} balance chahiye.`
+            `Minimum Rs ${MINIMUM_WITHDRAW_RS} balance chahiye.`
           );
         }
 
@@ -276,13 +288,15 @@ export default async function handler(
           COINS_PER_RUPEE;
 
 
-        // NOTE: Create a unique withdrawal document inside
-        // the same transaction as the coin deduction.
+        // NOTE (BUG FIX + CHANGED): Create a unique withdrawal document
+        // with an auto-generated ID inside the same transaction as the
+        // coin deduction. adminDb.collection("withdrawals").doc() with no
+        // argument = "new document with a fresh random ID".
 
-                const withdrawalRef =
-          doc(
-            collection(db, "withdrawals")
-          );
+        const withdrawalRef =
+          adminDb
+            .collection("withdrawals")
+            .doc();
 
 
         withdrawalId =
@@ -305,6 +319,7 @@ export default async function handler(
 
         // NOTE: New withdrawal records use the canonical schema:
         // user_id, coins, amount_rs, status, created_at, and upi.
+        // (CHANGED: FieldValue.serverTimestamp())
 
         transaction.set(
           withdrawalRef,
@@ -322,7 +337,7 @@ export default async function handler(
               "PENDING",
 
             created_at:
-              serverTimestamp(),
+              FieldValue.serverTimestamp(),
 
             upi:
               upi,
