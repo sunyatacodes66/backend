@@ -4,7 +4,7 @@
 
 const AD_REWARD_COINS = 50;
 
-const AD_TIMER_SECONDS = 30;
+const AD_TIMER_SECONDS = 20;
 
 const COINS_PER_RUPEE = 10;
 
