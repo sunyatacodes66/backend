@@ -629,17 +629,32 @@ Ready to earn?
 
 Tap START and your journey begins!`;
 
+    // NOTE: Channel buttons are plain URL buttons shown below the Open App button.
+  // Replace the two links below with the real EARN NOW channel links.
   const replyMarkup = {
-    inline_keyboard: [[
-      {
-        text: "▶ Open App",
-        web_app: {
-          url: WEB_APP_URL,
+    inline_keyboard: [
+      [
+        {
+          text: "▶ Open App",
+          web_app: {
+            url: WEB_APP_URL,
+          },
         },
-      },
-    ]],
+      ],
+      [
+        {
+          text: "📢 OFFICIAL",
+          url: "https://t.me/+rqGpE0uBoRo0ZmFl",
+        },
+      ],
+      [
+        {
+          text: "📢 BACKUP",
+          url: "https://t.me/+j3tQwU4gghtkZGQ1",
+        },
+      ],
+    ],
   };
-
   await bot.sendPhoto(
     chatId,
     WELCOME_IMAGE_URL,
