@@ -2,16 +2,14 @@
 // The session belongs to the authenticated Telegram user and starts
 // the server-side 30-second anti-cheat timer.
 
-import {
-  collection,
-  doc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+// NOTE (ADMIN MIGRATION): This file now uses the Firebase Admin SDK
+// (adminDb + FieldValue from firebaseAdmin.js) instead of the client SDK.
+// The behaviour is the same: same fields, same response, same timer logic.
 
 import {
-  db,
-} from "../_lib/firebase.js";
+  adminDb,
+  FieldValue,
+} from "../_lib/firebaseAdmin.js";
 
 import {
   getTelegramUserFromInitData,
@@ -29,8 +27,10 @@ export default async function handler(
   req,
   res
 ) {
-  console.log("DEBUG METHOD:", req.method);
-    res.setHeader(
+
+  // NOTE: CORS headers - only the Mini App's GitHub Pages origin is allowed.
+
+  res.setHeader(
     "Access-Control-Allow-Origin",
     "https://sunyatacodes66.github.io"
   );
@@ -45,14 +45,15 @@ export default async function handler(
     "Content-Type"
   );
 
-const method = String(req.method || "").toUpperCase();
 
-if (req.method === "OPTIONS") {
-  return res.status(200).json({
-    ok: true,
-    test: "OPTIONS_REACHED"
-  });
-}
+  // NOTE (CHANGED): The browser's preflight (OPTIONS) request now gets an
+  // empty 204 response, same as complete.js and request.js. The old debug
+  // console.log and the temporary "OPTIONS_REACHED" test response were removed.
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
 
   try {
 
@@ -78,33 +79,33 @@ if (req.method === "OPTIONS") {
       );
 
 
-    // NOTE: Generate a unique Firestore document ID for this ad session.
+    // NOTE (CHANGED): Admin SDK way to get a new document with an
+    // auto-generated unique ID in the "ad_sessions" collection.
+    // Old client SDK way was: doc(collection(db, "ad_sessions")).
 
     const sessionRef =
-      doc(
-        collection(
-          db,
-          "ad_sessions"
-        )
-      );
+      adminDb
+        .collection("ad_sessions")
+        .doc();
 
 
     const sessionId =
       sessionRef.id;
 
 
-    // NOTE: Store the session server-side.
-    // The server timestamp becomes the authoritative starting point.
+    // NOTE (CHANGED): Store the session server-side using sessionRef.set(...)
+    // (old client SDK way was setDoc(sessionRef, ...)).
+    // FieldValue.serverTimestamp() makes Firestore's own clock the
+    // authoritative starting point, so the user cannot fake the start time.
 
-    await setDoc(
-      sessionRef,
+    await sessionRef.set(
       {
         id: sessionId,
 
         user_id: userId,
 
         started_at:
-          serverTimestamp(),
+          FieldValue.serverTimestamp(),
 
         completed_at:
           null,
