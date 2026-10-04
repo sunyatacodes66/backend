@@ -2,17 +2,18 @@
 // The server verifies Telegram identity, session ownership,
 // session status, and the server-side elapsed time before awarding coins.
 
-import {
-  doc,
-  getDoc,
-  runTransaction,
-  serverTimestamp,
-  increment,
-} from "firebase/firestore";
+// NOTE (ADMIN MIGRATION): This file now uses the Firebase Admin SDK.
+// Differences from the old client-SDK version:
+//   1. doc(db, ...) + getDoc(ref)      ->  adminDb.collection(...).doc(...) + ref.get()
+//   2. snapshot.exists()  (a function) ->  snapshot.exists  (a PROPERTY, no brackets)
+//   3. runTransaction(db, fn)          ->  adminDb.runTransaction(fn)
+//   4. serverTimestamp() / increment() ->  FieldValue.serverTimestamp() / FieldValue.increment()
+// The checks, rules and responses are exactly the same as before.
 
 import {
-  db,
-} from "../_lib/firebase.js";
+  adminDb,
+  FieldValue,
+} from "../_lib/firebaseAdmin.js";
 
 import {
   getTelegramUserFromInitData,
@@ -30,6 +31,8 @@ export default async function handler(
   req,
   res
 ) {
+
+  // NOTE: CORS headers - only the Mini App's GitHub Pages origin is allowed.
 
   res.setHeader(
     "Access-Control-Allow-Origin",
@@ -50,7 +53,7 @@ export default async function handler(
     res.status(204).end();
     return;
   }
-  
+
   // NOTE: Only POST requests are allowed for completing ad sessions.
 
   if (req.method !== "POST") {
@@ -104,32 +107,33 @@ export default async function handler(
       );
 
 
+    // NOTE (CHANGED): Admin SDK document references.
+
     const sessionRef =
-      doc(
-        db,
-        "ad_sessions",
-        sessionId
-      );
+      adminDb
+        .collection("ad_sessions")
+        .doc(sessionId);
 
 
     const userRef =
-      doc(
-        db,
-        "users",
-        userId
-      );
+      adminDb
+        .collection("users")
+        .doc(userId);
 
 
     // NOTE: Read the session before entering the transaction so that
     // obviously invalid/missing sessions can be rejected early.
+    // (CHANGED: sessionRef.get() instead of getDoc(sessionRef))
 
     const sessionSnapshot =
-      await getDoc(
-        sessionRef
-      );
+      await sessionRef.get();
 
 
-    if (!sessionSnapshot.exists()) {
+    // NOTE (CHANGED): In the Admin SDK "exists" is a PROPERTY, not a function.
+    // Writing sessionSnapshot.exists() here would crash with
+    // "exists is not a function".
+
+    if (!sessionSnapshot.exists) {
       res.status(404).json({
         ok: false,
         error:
@@ -182,6 +186,7 @@ export default async function handler(
 
     // NOTE: The frontend timer is NOT trusted.
     // We calculate elapsed time from the server-side Firestore timestamp.
+    // (The Admin SDK also returns a Timestamp object with toMillis().)
 
     const startedAt =
       sessionData.started_at;
@@ -242,10 +247,13 @@ export default async function handler(
     // the user's coins. This prevents two simultaneous requests
     // from rewarding the same session twice.
 
-let rewardGranted = false;
-    
-    await runTransaction(
-      db,
+    let rewardGranted = false;
+
+
+    // NOTE (CHANGED): adminDb.runTransaction(...) instead of
+    // runTransaction(db, ...).
+
+    await adminDb.runTransaction(
       async (transaction) => {
 
         const freshSessionSnapshot =
@@ -254,8 +262,10 @@ let rewardGranted = false;
           );
 
 
+        // NOTE (CHANGED): .exists is a property here too (no brackets).
+
         if (
-          !freshSessionSnapshot.exists()
+          !freshSessionSnapshot.exists
         ) {
           throw new Error(
             "Ad session not found."
@@ -282,27 +292,24 @@ let rewardGranted = false;
 
 
         // NOTE: Re-check the session status inside the transaction.
-        // Only one request can successfully change STARTED → COMPLETED.
+        // A COMPLETED session is treated as an idempotent retry.
+        // It will NOT receive another coin reward.
 
-        // NOTE: Re-check the session status inside the transaction.
-// A COMPLETED session is treated as an idempotent retry.
-// It will NOT receive another coin reward.
+        if (
+          freshSessionData.status ===
+          "COMPLETED"
+        ) {
+          return;
+        }
 
-if (
-    freshSessionData.status ===
-    "COMPLETED"
-) {
-    return;
-}
-
-if (
-    freshSessionData.status !==
-    "STARTED"
-) {
-    throw new Error(
-        "Ad session has already been processed."
-    );
-}
+        if (
+          freshSessionData.status !==
+          "STARTED"
+        ) {
+          throw new Error(
+            "Ad session has already been processed."
+          );
+        }
 
 
         const freshStartedAt =
@@ -334,10 +341,16 @@ if (
           );
         }
 
-rewardGranted = true;
-        
+
+        // NOTE: Only now is the reward really granted. The flag is read
+        // after the transaction to build the response.
+
+        rewardGranted = true;
+
+
         // NOTE: Mark the session as COMPLETED and store the exact
         // reward amount that was credited.
+        // (CHANGED: FieldValue.serverTimestamp())
 
         transaction.update(
           sessionRef,
@@ -346,7 +359,7 @@ rewardGranted = true;
               "COMPLETED",
 
             completed_at:
-              serverTimestamp(),
+              FieldValue.serverTimestamp(),
 
             coins_awarded:
               AD_REWARD_COINS,
@@ -356,17 +369,20 @@ rewardGranted = true;
 
         // NOTE: Credit coins and task completion atomically with
         // the session completion.
+        // (CHANGED: FieldValue.increment(...) instead of increment(...))
+        // transaction.update() fails if the user document does not exist,
+        // which is the same safe behaviour as before.
 
         transaction.update(
           userRef,
           {
             coins:
-              increment(
+              FieldValue.increment(
                 AD_REWARD_COINS
               ),
 
             tasksCompleted:
-              increment(1),
+              FieldValue.increment(1),
           }
         );
       }
@@ -376,22 +392,22 @@ rewardGranted = true;
     // NOTE: Return a successful result only after the transaction
     // has completed successfully.
 
-   res.status(200).json({
-    ok: true,
+    res.status(200).json({
+      ok: true,
 
-    session_id:
+      session_id:
         sessionId,
 
-    coins_awarded:
+      coins_awarded:
         rewardGranted
-            ? AD_REWARD_COINS
-            : 0,
+          ? AD_REWARD_COINS
+          : 0,
 
-    message:
+      message:
         rewardGranted
-            ? "Ad completed successfully."
-            : "Ad session was already completed.",
-});
+          ? "Ad completed successfully."
+          : "Ad session was already completed.",
+    });
 
   } catch (error) {
 
